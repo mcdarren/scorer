@@ -104,9 +104,19 @@ button{cursor:pointer;touch-action:manipulation}
 .ends .win{grid-column:span 3;padding:14px;font-size:16px;color:var(--make);border-color:color-mix(in srgb,var(--make) 45%,var(--line2));background:color-mix(in srgb,var(--make) 10%,var(--panel2))}
 .minor{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .minor .btn{font-size:13px;padding:8px 12px;color:var(--muted)}
-.log{list-style:none;margin:0;padding:0 4px;display:grid;gap:3px;font-size:13px;color:var(--muted)}
-.log li:first-child{color:var(--text)}
-.log b{color:var(--text);font-weight:600}
+.log{list-style:none;margin:0;padding:0;display:grid;font-size:14px;color:var(--muted)}
+.log li,.loghead{display:grid;grid-template-columns:2em minmax(0,1fr) 6.6em 2.8em 3em;gap:8px;align-items:baseline;padding:7px 6px;border-bottom:1px solid var(--line)}
+.loghead{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding-block:4px;border-bottom-color:var(--line2)}
+.loghead span:nth-child(n+4){text-align:right}
+.log li:first-child{background:color-mix(in srgb,var(--chalk) 8%,transparent);border-radius:6px}
+.log li.hint{display:block;border:0}
+.log .n{font:12px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.log b{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log .e{white-space:nowrap;justify-self:start;text-align:left}
+.loghead span:nth-child(3){justify-self:start}
+.log .e i{font-style:normal;color:var(--make)}
+.log .r,.log .s{text-align:right;font-variant-numeric:tabular-nums}
+.log .s{color:var(--text);font-weight:600}
 
 /* keypad sheet */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20}
@@ -239,6 +249,7 @@ button{cursor:pointer;touch-action:manipulation}
         <button class="btn" id="endBtn">End match early</button>
       </div>
       <div class="resume" id="endAsk" hidden><span>End this match now? It's saved as ended early.</span><span class="acts"><button class="btn danger" id="endYes">End match</button><button class="btn" id="endNo">Keep playing</button></span></div>
+      <div class="loghead" id="pLogHead" hidden><span>#</span><span>Player</span><span>Ended</span><span>Run</span><span>Score</span></div>
       <ol class="log" id="pLog"></ol>
     </div>
   </div>
@@ -333,7 +344,7 @@ function replay(m){
     }
     if (r.end !== 'bfoul' && !(label === END_LABEL.foul3)) st.openBreak = false;
     const row = { label, run, score: st.score[p], end: r.end, good: false };
-    P.rows.push(row); seq.push({ p, row });
+    P.rows.push(row); seq.push({ p, row, n: P.rows.length });
     if (st.winner === null && (r.end === 'win' || st.score[p] >= m.races[p])) st.winner = p;
     st.sh = next;
   }
@@ -553,7 +564,9 @@ function renderScore(){
     $('tBalls').textContent = curBalls(st);
     $('tInfo').innerHTML = `At the table: <b>${esc(m.names[st.sh])}</b>` + (cur.racks ? `<br><span class="runso">Run so far ${cur.runSoFar}+ (${cur.racks} re-rack${cur.racks > 1 ? 's' : ''})</span>` : '<br>Tap how the inning ended');
     $('bfoulBtn').hidden = !st.openBreak || cur.racks > 0;
-    $('pLog').innerHTML = replay(m).seq.slice(-3).reverse().map(x => `<li><b>${esc(m.names[x.p])}</b> ${esc(x.row.label.toLowerCase())} · run ${x.row.run} · ${x.row.score}</li>`).join('') || '<li>After each inning, tap how it ended and how many balls were left.</li>';
+    const seq = replay(m).seq;
+    $('pLogHead').hidden = !seq.length;
+    $('pLog').innerHTML = seq.slice().reverse().map(x => `<li><span class="n">${x.n}</span><b>${esc(m.names[x.p])}</b><span class="e">${esc(x.row.label)}${x.row.good ? ' <i title="Good: the opponent pocketed nothing next">✓</i>' : ''}</span><span class="r">${x.row.run}</span><span class="s">${x.row.score}</span></li>`).join('') || '<li class="hint">After each inning, tap how it ended and how many balls were left.</li>';
   } else {
     const w = st.winner;
     $('dWin').textContent = m.names[w] + ' wins';
