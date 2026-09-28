@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Straight Pool Scorebook</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1214">
+<meta name="description" content="Score straight pool (14.1) by inning, keep your match history and stats, and export PDF scoresheets.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="14.1 Scorebook">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="jspdf.umd.min.js"></script>
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#0f1214; --panel:#171b1e; --panel2:#1e2327; --line:#2a3035; --line2:#363d43;
+  --text:#ebe9e4; --muted:#8e989e; --dim:#646d73;
+  --chalk:#6ab7e6; --chalk-ink:#0c2230;
+  --make:#74c47a; --foul:#ef6a5f; --safe:#d8a748; --miss:#b3bcc2;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--text);font:15px/1.45 var(--sans);padding-inline:max(16px, env(safe-area-inset-left, 0px));padding-block:env(safe-area-inset-top, 0px) calc(40px + env(safe-area-inset-bottom, 0px));margin:0}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+:focus-visible{outline:2px solid var(--chalk);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;display:grid;gap:12px}
+.wide{max-width:1000px}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:6px;padding-block:10px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.brand{font:700 20px var(--display);letter-spacing:.03em;text-transform:uppercase;margin-right:6px;white-space:nowrap}
+.brand span{color:var(--chalk)}
+.tab{background:none;border:1px solid transparent;border-radius:7px;padding:7px 12px;font-weight:600;font-size:14px;color:var(--muted)}
+.tab[aria-selected=true]{background:var(--panel2);border-color:var(--line2);color:var(--text)}
+.sp{flex:1}
+.sync{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.sync::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--dim)}
+.sync[data-s=ok]::before{background:var(--make)}
+.sync[data-s=busy]::before{background:var(--safe)}
+.sync[data-s=local]::before{background:var(--foul)}
+@media (max-width:420px){.brand{font-size:17px}.sync span{display:none}}
+
+.btn{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--chalk);border-color:var(--chalk);color:var(--chalk-ink)}
+.btn.danger{color:var(--foul)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px}
+.h{margin:0;font:700 24px var(--display);letter-spacing:.03em;text-transform:uppercase}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.fld input,.fld select{background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:11px 12px;font-size:17px;min-width:0;width:100%;color:var(--text)}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:10px}
+.hcap{border-top:1px solid var(--line);padding-top:10px}
+.hcap summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.hcap .prow2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.seg .sl{grid-column:span 2;font-size:12px;color:var(--muted)}
+.seg button{background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:11px;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg button[aria-pressed=true]{border-color:var(--chalk);color:var(--chalk);background:color-mix(in srgb,var(--chalk) 10%,var(--bg))}
+.big{background:var(--chalk);color:var(--chalk-ink);border:0;border-radius:10px;padding:16px;font:700 18px var(--sans)}
+.resume{border:1px solid color-mix(in srgb,var(--chalk) 45%,var(--line));border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.resume b{color:var(--text)}
+.note{font-size:13px;color:var(--muted);margin:0}
+
+/* scoreboard */
+.title{font:600 13px var(--sans);color:var(--muted);text-align:center;letter-spacing:.04em}
+.pl{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"nm sc" "sub sc";align-items:center;position:relative;overflow:hidden}
+.pl.at{border-color:color-mix(in srgb,var(--chalk) 55%,var(--line));background:color-mix(in srgb,var(--chalk) 7%,var(--panel))}
+.pl.at::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--chalk)}
+.nm{grid-area:nm;display:flex;align-items:center;gap:8px;min-width:0}
+.nm b{font:700 24px var(--display);letter-spacing:.02em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fb{font:600 11px var(--sans);color:var(--foul);border:1px solid color-mix(in srgb,var(--foul) 50%,transparent);border-radius:4px;padding:1px 6px;white-space:nowrap}
+.fb:empty{display:none}
+.sub{grid-area:sub;font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.sc{grid-area:sc;display:flex;align-items:baseline;gap:4px}
+.sc b{font:700 48px/1 var(--display);font-variant-numeric:tabular-nums}
+.sc span{font:500 14px var(--mono);color:var(--muted)}
+.table{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.balls{display:flex;flex-direction:column;align-items:center;line-height:1}
+.balls b{font:700 40px var(--display);font-variant-numeric:tabular-nums}
+.balls span{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.tinfo{font-size:14px;color:var(--muted);min-width:0}
+.tinfo b{color:var(--text)}
+.tinfo .runso{color:var(--chalk);font-weight:600}
+.newrack{background:color-mix(in srgb,var(--chalk) 14%,var(--panel2));border:1px solid color-mix(in srgb,var(--chalk) 45%,var(--line2));color:var(--chalk);border-radius:10px;padding:12px 12px;font:700 15px var(--sans);white-space:nowrap}
+
+.ends{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ends button{border-radius:12px;border:1px solid var(--line2);background:var(--panel2);font:700 20px var(--sans);padding:22px 6px;-webkit-user-select:none;user-select:none}
+.ends button:active{transform:scale(.97)}
+.ends .miss{color:var(--miss)}
+.ends .safe{color:var(--safe)}
+.ends .foul{color:var(--foul)}
+.ends .win{grid-column:span 3;padding:14px;font-size:16px;color:var(--make);border-color:color-mix(in srgb,var(--make) 45%,var(--line2));background:color-mix(in srgb,var(--make) 10%,var(--panel2))}
+.minor{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.minor .btn{font-size:13px;padding:8px 12px;color:var(--muted)}
+.log{list-style:none;margin:0;padding:0 4px;display:grid;gap:3px;font-size:13px;color:var(--muted)}
+.log li:first-child{color:var(--text)}
+.log b{color:var(--text);font-weight:600}
+
+/* keypad sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--panel);border-top:1px solid var(--line2);border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;max-width:560px;margin:0 auto;max-height:92vh;overflow:auto}
+.sheet h3{margin:0;font:700 22px var(--display);letter-spacing:.03em;text-transform:uppercase}
+.sheet h3 .t-miss{color:var(--miss)} .sheet h3 .t-safe{color:var(--safe)} .sheet h3 .t-foul{color:var(--foul)} .sheet h3 .t-win{color:var(--make)}
+.sheet .q{font-size:14px;color:var(--muted);margin:0}
+.warn{font-size:13px;color:var(--foul);margin:0}
+.keys{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.keys button{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.keys button b{font:700 24px/1 var(--display);font-variant-numeric:tabular-nums}
+.keys button small{font:11px var(--mono);color:var(--muted)}
+.keys button:disabled{opacity:.25}
+.keys button:active:not(:disabled){transform:scale(.96)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+
+/* done */
+.win2{font:700 32px/1.1 var(--display);text-transform:uppercase;color:var(--chalk)}
+.fs{font:700 20px var(--display);font-variant-numeric:tabular-nums}
+.dt{overflow-x:auto}
+.dt table{border-collapse:collapse;width:100%;min-width:300px;font-size:13px}
+.dt th,.dt td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dt th:first-child,.dt td:first-child{text-align:left;color:var(--muted);font-weight:400}
+.dt thead th{color:var(--text);font-weight:600}
+.dt td small{color:var(--dim)}
+
+/* history */
+.hbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;justify-content:space-between}
+.hbar .fld{min-width:220px}
+.hbar .fld select{font-size:15px;padding:9px 10px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:2px}
+.tile span{font-size:12px;color:var(--muted)}
+.tile b{font:700 28px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.tile small{font-size:12px;color:var(--dim)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.chart{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 12px 8px;position:relative;min-width:0}
+.chart figcaption{font-size:13px;font-weight:600;margin-bottom:6px}
+.chart figcaption span{color:var(--muted);font-weight:400}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .tip{position:absolute;pointer-events:none;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:6px 9px;font-size:12px;white-space:nowrap;transform:translate(-50%,-110%);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.chart .tip b{font:600 13px var(--mono)}
+.chart .none{color:var(--dim);font-size:13px;padding:24px 0;text-align:center}
+.sect{display:flex;justify-content:space-between;align-items:baseline}
+.sect h2{margin:0;font:600 12px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sect span{font-size:12px;color:var(--dim)}
+.mlist{display:grid;gap:6px}
+.mrow{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left;width:100%}
+.mrow:hover{border-color:var(--line2)}
+.mrow[aria-expanded=true]{border-color:var(--chalk)}
+.mrow .d{font:12px var(--mono);color:var(--muted)}
+.mrow .who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.mrow .who b{font-weight:600}
+.mrow .who .w{color:var(--chalk)}
+.mrow .r{font:12px var(--mono);color:var(--muted);white-space:nowrap}
+@media (max-width:560px){
+  .mrow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"d r" "who who";row-gap:4px}
+  .mrow .d{grid-area:d}.mrow .r{grid-area:r}.mrow .who{grid-area:who;white-space:normal}
+  .tile:last-child:nth-child(odd){grid-column:1/-1}
+}
+.badge{font:600 10px var(--sans);letter-spacing:.06em;border-radius:4px;padding:2px 6px;margin-left:6px;vertical-align:1px}
+.badge.live{background:color-mix(in srgb,var(--make) 20%,transparent);color:var(--make)}
+.badge.ended{background:var(--panel2);color:var(--muted)}
+.detail{background:var(--panel);border:1px solid var(--chalk);border-radius:8px;padding:12px 14px;display:grid;gap:12px}
+.meta{font-size:12px;color:var(--muted)}
+.inn{overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:6px}
+.inn table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+.inn th,.inn td{padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}
+.inn th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:500}
+.inn td.e{text-align:left;color:var(--muted)}
+.inn td.mid{border-left:1px solid var(--line2)}
+.nudge{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid color-mix(in srgb,var(--safe) 50%,var(--line));background:color-mix(in srgb,var(--safe) 8%,var(--panel));border-radius:10px;padding:10px 12px;font-size:14px;color:var(--text)}
+.nudge b{font-weight:600}
+.empty{background:var(--panel);border:1px dashed var(--line2);border-radius:8px;padding:22px;color:var(--muted);text-align:center}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:9px 14px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:40;max-width:calc(100% - 32px)}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}.ends button:active,.keys button:active{transform:none}}
+</style>
+</head>
+<body>
+
+
+<nav class="bar" role="tablist" aria-label="Sections">
+  <span class="brand">14.1 <span>Scorebook</span></span>
+  <button class="tab" role="tab" data-view="score">Score</button>
+  <button class="tab" role="tab" data-view="history">History</button>
+  <span class="sp"></span>
+  <span class="sync" id="sync"><span id="syncText"></span></span>
+</nav>
+
+<!-- ============ SCORE ============ -->
+<section id="vScore" class="wrap">
+  <div id="setup" class="card">
+    <h2 class="h">New match</h2>
+    <div class="nudge" id="installTip" hidden><span>Add this app to your Home Screen so your match history stays on this phone: tap <b>Share</b>, then <b>Add to Home Screen</b>.</span><button class="btn" id="installX">OK</button></div>
+    <div class="nudge" id="sNudge" hidden><span id="sNudgeText"></span><button class="btn primary" id="sNudgeBtn">Back up now</button></div>
+    <div id="resume" class="resume" hidden><span id="resumeText"></span><button class="btn primary" id="resumeBtn">Resume</button></div>
+    <label class="fld">Match or league (optional)<input id="sTitle" maxlength="40" placeholder="e.g. Tigres s2" autocomplete="off"></label>
+    <div class="prow"><label class="fld">Player 1<input id="sName0" list="names" maxlength="16" placeholder="Name" autocomplete="off"></label><label class="fld">Race<input id="sRace0" type="number" inputmode="numeric" min="1" max="999"></label></div>
+    <div class="prow"><label class="fld">Player 2<input id="sName1" list="names" maxlength="16" placeholder="Name" autocomplete="off"></label><label class="fld">Race<input id="sRace1" type="number" inputmode="numeric" min="1" max="999"></label></div>
+    <details class="hcap"><summary>Handicap: starting scores</summary>
+      <div class="prow2"><label class="fld"><span id="sStartL0">Player 1 starts on</span><input id="sStart0" type="number" inputmode="numeric" value="0"></label><label class="fld"><span id="sStartL1">Player 2 starts on</span><input id="sStart1" type="number" inputmode="numeric" value="0"></label></div>
+    </details>
+    <div class="seg" id="sBreak"><span class="sl">Opening break</span><button data-b="0" id="sB0">Player 1</button><button data-b="1" id="sB1">Player 2</button></div>
+    <button class="big" id="sStart">Start match</button>
+    <datalist id="names"></datalist>
+  </div>
+
+  <div id="play" hidden>
+    <div class="wrap" style="gap:10px">
+      <div class="title" id="pTitle"></div>
+      <div class="pl" id="pl0"><div class="nm"><b id="pN0"></b><span class="fb" id="pF0"></span></div><div class="sc"><b id="pS0">0</b><span id="pR0"></span></div><div class="sub" id="pSub0"></div></div>
+      <div class="pl" id="pl1"><div class="nm"><b id="pN1"></b><span class="fb" id="pF1"></span></div><div class="sc"><b id="pS1">0</b><span id="pR1"></span></div><div class="sub" id="pSub1"></div></div>
+      <div class="table">
+        <div class="balls"><b id="tBalls">15</b><span>on table</span></div>
+        <div class="tinfo" id="tInfo"></div>
+        <button class="newrack" id="newRack">New rack</button>
+      </div>
+      <div class="ends">
+        <button class="miss" data-end="miss">Miss</button>
+        <button class="safe" data-end="safe">Safety</button>
+        <button class="foul" data-end="foul">Foul</button>
+        <button class="win" data-end="win" id="winBtn">Won the match</button>
+      </div>
+      <div class="minor">
+        <button class="btn" id="bfoulBtn">Break foul</button>
+        <button class="btn" id="undoBtn">Undo</button>
+        <button class="btn" id="endBtn">End match early</button>
+      </div>
+      <div class="resume" id="endAsk" hidden><span>End this match now? It's saved as ended early.</span><span class="acts"><button class="btn danger" id="endYes">End match</button><button class="btn" id="endNo">Keep playing</button></span></div>
+      <ol class="log" id="pLog"></ol>
+    </div>
+  </div>
+
+  <div id="done" class="card" hidden>
+    <div class="win2" id="dWin"></div>
+    <div class="fs" id="dScore"></div>
+    <div class="dt" id="dTable"></div>
+    <div class="two"><button class="btn primary" id="dPdf">Download PDF</button><button class="btn" id="dHist">See in History</button></div>
+    <div class="two"><button class="btn" id="dRematch">Rematch</button><button class="btn" id="dNew">New match</button></div>
+    <button class="btn" id="dUndo" style="justify-self:center;font-size:13px;color:var(--muted)">Undo last inning</button>
+  </div>
+</section>
+
+<!-- ============ HISTORY ============ -->
+<section id="vHistory" class="wrap wide" hidden>
+  <div class="hbar">
+    <label class="fld">Stats for<select id="hPlayer"></select></label>
+    <div class="acts">
+      <button class="btn" id="hCsv">Export all (CSV)</button>
+      <button class="btn" id="hJson">Back up (JSON)</button>
+      <button class="btn" id="hImport">Restore backup</button>
+      <input type="file" id="hImportFile" accept=".json,application/json" hidden>
+    </div>
+  </div>
+  <div class="nudge" id="hNudge" hidden><span id="hNudgeText"></span><button class="btn primary" id="hNudgeBtn">Back up now</button></div>
+  <div class="tiles" id="hTiles"></div>
+  <div class="charts">
+    <figure class="chart" id="chAvg"><figcaption>Average run <span>· balls per inning, each match</span></figcaption><div class="plot"></div></figure>
+    <figure class="chart" id="chHr"><figcaption>High run <span>· each match</span></figcaption><div class="plot"></div></figure>
+  </div>
+  <div class="sect"><h2>Matches</h2><span id="hCount"></span></div>
+  <div class="mlist" id="hList"></div>
+</section>
+
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="shTitle">
+  <h3 id="shTitle"></h3>
+  <p class="q" id="shQ"></p>
+  <p class="warn" id="shWarn" hidden></p>
+  <div class="keys" id="shKeys"></div>
+  <button class="btn" id="shCancel">Cancel</button>
+</div>
+<div class="scrim" id="scrim2" hidden></div>
+<div class="sheet" id="bfSheet" hidden role="dialog" aria-modal="true" aria-labelledby="bfTitle">
+  <h3 id="bfTitle"><span class="t-foul">Break foul</span> · −2</h3>
+  <p class="q">The opponent chooses: take the table as it lies, or have the breaker break again.</p>
+  <div class="two"><button class="btn" id="bfTake"></button><button class="btn" id="bfRe"></button></div>
+  <button class="btn" id="bfCancel">Cancel</button>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="store.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const CFG = Object.assign({ path:'user', embedded:false }, window.BOOK_CFG || {});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]);
+const normName = s => String(s || '').trim().toLowerCase();
+let toastT;
+function toast(msg){ const el = $('toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2400); }
+
+/* =====================================================================
+   RULES — innings-based 14.1. A match is a list of innings:
+   { end:'miss'|'safe'|'foul'|'bfoul'|'win', run, left, racks, good, rebreak, ts }
+   Games are registered in GAMES so 8-ball / 9-ball can be added later.
+   ===================================================================== */
+const END_LABEL = { miss:'Miss', safe:'Safety', foul:'Foul(-1)', foul3:'Foul(-16)', bfoul:'Break foul(-2)', win:'End Match' };
+function replay(m){
+  const st = { score:[...(m.start || [0,0])], fouls:[0,0], sh:m.breaker, balls:15, winner:null, openBreak:true };
+  const per = [0,1].map(() => ({ runs:[], made:0, miss:0, safe:0, foul:0, gm:0, gs:0, gf:0, hr:0, rows:[] })), seq = [];
+  for (const r of m.innings || []){
+    const p = st.sh, o = 1 - p, P = per[p], run = r.run || 0;
+    st.score[p] += run; P.made += run; P.runs.push(run); P.hr = Math.max(P.hr, run);
+    let label = END_LABEL[r.end] || r.end, next = o;
+    switch(r.end){
+      case 'miss': P.miss++; st.fouls[p] = 0; st.balls = r.left; break;
+      case 'safe': P.safe++; st.fouls[p] = 0; st.balls = r.left; break;
+      case 'foul':
+        P.foul++;
+        st.score[p] -= 1; st.fouls[p] = run > 0 ? 1 : st.fouls[p] + 1;
+        if (st.fouls[p] >= 3){ st.score[p] -= 15; st.fouls[p] = 0; st.balls = 15; next = p; label = END_LABEL.foul3; st.openBreak = true; }
+        else st.balls = r.left;
+        break;
+      case 'bfoul': P.foul++; st.score[p] -= 2; st.balls = 15; next = r.rebreak ? p : o; st.openBreak = !!r.rebreak; break;
+      case 'win': st.balls = r.left; break;
+    }
+    if (r.end !== 'bfoul' && !(label === END_LABEL.foul3)) st.openBreak = false;
+    const row = { label, run, score: st.score[p], end: r.end, good: false };
+    P.rows.push(row); seq.push({ p, row });
+    if (st.winner === null && (r.end === 'win' || st.score[p] >= m.races[p])) st.winner = p;
+    st.sh = next;
+  }
+  // A miss, safety or foul is "good" when the opponent's next inning pockets nothing.
+  seq.forEach((x, i) => {
+    const nx = seq[i+1], e = x.row.end;
+    if (!nx || nx.p === x.p || nx.row.run !== 0 || !(e === 'miss' || e === 'safe' || e === 'foul' || e === 'bfoul')) return;
+    x.row.good = true; const P = per[x.p];
+    if (e === 'miss') P.gm++; else if (e === 'safe') P.gs++; else P.gf++;
+  });
+  per.forEach((P, i) => {
+    P.inn = P.rows.length; P.score = st.score[i]; P.won = st.winner === i;
+    P.taken = P.made + P.miss + P.safe + P.foul;
+    P.avg = P.inn ? P.made / P.inn : 0;
+  });
+  return { st, per, seq };
+}
+function summarize(m){ const { st, per } = replay(m); return { score: st.score, winner: st.winner, inn: per.map(p => p.inn), hr: per.map(p => p.hr), avg: per.map(p => +p.avg.toFixed(3)) }; }
+const GAMES = { straight: { label:'Straight pool (14.1)', replay } };
+
+/* ---------- storage: private per-person history in the artifact database, plus a copy on this device ---------- */
+const LIVE_KEY = 'sb:live', LOCAL_KEY = 'sb:local';
+let COL = null, MATCHES = [], dbMatches = [], VIEW = 'score', LIVE = null, readOnly = false;
+function setSync(s, t){ const a = $('sync'), b = $('syncText'); if (a) a.dataset.s = s; if (b) b.textContent = t; }
+const localMatches = () => store.get(LOCAL_KEY) || [];
+function saveLocal(m){ const l = localMatches().filter(x => x.id !== m.id); l.unshift(m); store.set(LOCAL_KEY, l.slice(0, 200)); }
+const writing = {};
+const HOST = window.BOOK_STORE || null;   // self-hosted build: matches kept on this device (IndexedDB)
+async function push(m){
+  if (HOST){
+    try { await HOST.put(JSON.parse(JSON.stringify(m))); const i = dbMatches.findIndex(x => x.id === m.id); if (i >= 0) dbMatches[i] = m; else dbMatches.push(m); setSync('ok', 'Saved on this phone'); }
+    catch(_){ setSync('local', 'Not saved'); toast("Couldn't save to this device's storage"); }
+    merge(); return;
+  }
+  saveLocal(m);
+  if (!COL || readOnly){ setSync('local', 'On this device'); merge(); return; }
+  const w = writing[m.id] || (writing[m.id] = { busy:false, dirty:false });
+  w.dirty = true; w.latest = m;
+  if (w.busy) return;
+  w.busy = true;
+  while (w.dirty){
+    w.dirty = false;
+    const body = JSON.parse(JSON.stringify(w.latest));
+    setSync('busy', 'Saving…');
+    try {
+      await COL.doc(body.id).set(body); setSync('ok', 'Saved');
+      store.set(LOCAL_KEY, localMatches().filter(x => x.id !== body.id || (x.updated || 0) > (body.updated || 0)));
+    } catch(e){
+      if (e && e.code === 'unavailable'){ await new Promise(r => setTimeout(r, 1500 + Math.random()*1500)); w.dirty = true; continue; }
+      if (e && e.code === 'invalid_argument'){ readOnly = true; toast('Your history can only be kept on this device. Ask the owner for Contributor access to save it online.'); }
+      setSync('local', 'On this device'); break;
+    }
+  }
+  w.busy = false;
+}
+async function remove(id){
+  if (HOST){ try { await HOST.del(id); } catch(_){} dbMatches = dbMatches.filter(x => x.id !== id); MATCHES = MATCHES.filter(x => x.id !== id); renderHistory(); return; }
+  store.set(LOCAL_KEY, localMatches().filter(x => x.id !== id));
+  MATCHES = MATCHES.filter(x => x.id !== id); dbMatches = dbMatches.filter(x => x.id !== id);
+  if (COL){ try { await COL.doc(id).delete(); } catch(_){ toast('Could not delete the online copy'); } }
+  renderHistory();
+}
+function fromEvents(m){
+  const inn = [], ev = m.events || []; let run = 0, left = 15, racks = 0;
+  for (let i = 0; i < ev.length; i++){
+    const e = ev[i];
+    if (e.type === 'make'){ const n = e.n || 1; run += n; left -= n; if (left <= 1){ racks++; left = 15; } continue; }
+    if (e.type === 'miss' || e.type === 'safe' || e.type === 'foul'){ inn.push({ end:e.type, run, left, racks, ts:e.ts }); run = 0; racks = 0; continue; }
+    if (e.type === 'bfoul'){ inn.push({ end:'bfoul', run:0, left:15, racks:0, ts:e.ts, rebreak: !!(ev[i+1] && ev[i+1].type === 'rebreak') }); left = 15; run = 0; racks = 0; }
+  }
+  if (run > 0 || m.status === 'finished') inn.push({ end:'win', run, left, racks, ts:(ev[ev.length-1] || {}).ts || m.updated });
+  return { ...m, start: m.start || [0,0], innings: inn, legacy: true };
+}
+const normalize = m => !m || !m.id ? null : Array.isArray(m.innings) ? m : Array.isArray(m.events) ? fromEvents(m) : null;
+function merge(){
+  const by = new Map();
+  for (const m of dbMatches) by.set(m.id, m);
+  for (const m of localMatches()){ const d = by.get(m.id); if (!d || (m.updated || 0) > (d.updated || 0)) by.set(m.id, m); }
+  if (LIVE){ const d = by.get(LIVE.id); if (!d || (LIVE.updated || 0) >= (d.updated || 0)) by.set(LIVE.id, LIVE); }
+  MATCHES = [...by.values()].map(normalize).filter(Boolean).sort((a,b) => (b.created || 0) - (a.created || 0));
+  renderNames();
+  if (VIEW === 'history') renderHistory();
+}
+async function connect(){
+  if (HOST){
+    try { dbMatches = (await HOST.all()) || []; setSync('ok', HOST.label || 'Saved on this phone'); } catch(_){ setSync('local', 'Storage unavailable'); }
+    merge(); return;
+  }
+  if (!(window.claude && typeof window.claude.use === 'function')){ setSync('local', 'On this device'); merge(); return; }
+  try {
+    const [db, user] = await Promise.all([window.claude.use('db'), CFG.path === 'root' ? null : window.claude.use('user')]);
+    const uid = CFG.path === 'root' ? 'root' : (user ? await user.id() : null);
+    if (!db || !uid){ setSync('local', 'On this device'); merge(); return; }
+    COL = CFG.path === 'root' ? db.collection('matches') : db.doc('data/users/' + uid + '/app').collection('matches');
+    setSync('ok', 'Synced');
+    COL.orderBy('created', 'desc').limit(1000).onSnapshot(snap => {
+      dbMatches = snap.docs.filter(d => d.exists).map(d => ({ ...d.data(), id: d.id }));
+      merge();
+      for (const m of localMatches()){ const d = dbMatches.find(x => x.id === m.id); if (!d || (m.updated || 0) > (d.updated || 0)) push(m); }
+    }, () => setSync('local', 'On this device'));
+  } catch(_){ setSync('local', 'On this device'); merge(); }
+}
+
+/* ---------- live match ---------- */
+let breakSel = null, cur = { racks:0, runSoFar:0 };
+let wake = null;
+async function keepAwake(on){
+  try {
+    if (on && !wake && navigator.wakeLock){ wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); }
+    if (!on && wake){ await wake.release(); wake = null; }
+  } catch(_){}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && LIVE && LIVE.status === 'live') keepAwake(true); });
+const newId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function saveLive(){
+  LIVE.updated = Date.now(); LIVE.cur = cur; LIVE.sum = summarize(LIVE);
+  store.set(LIVE_KEY, LIVE); push(LIVE); merge();
+}
+function startMatch(o){
+  LIVE = { id:newId(), game:'straight', v:2, created:Date.now(), updated:Date.now(), status:'live', title:o.title, names:o.names, races:o.races, start:o.start, breaker:o.breaker, innings:[] };
+  cur = { racks:0, runSoFar:0 };
+  saveLive(); keepAwake(true); renderScore();
+}
+function curBalls(st){ return cur.racks ? cur.tableNow : st.balls; }
+function addInning(end, left, extra){
+  const { st } = replay(LIVE);
+  const onTable = curBalls(st);
+  let run = cur.runSoFar + (onTable - left);
+  if (end === 'bfoul') run = 0;
+  const p = st.sh;
+  if ((end === 'miss' || end === 'safe') && st.score[p] + run >= LIVE.races[p]) end = 'win';
+  const rec = { end, run, left, racks: cur.racks, ts: Date.now() };
+  Object.assign(rec, extra || {});
+  LIVE.innings.push(rec);
+  cur = { racks:0, runSoFar:0 };
+  const r2 = replay(LIVE);
+  if (r2.st.winner !== null){ LIVE.status = 'finished'; LIVE.finished = Date.now(); keepAwake(false); }
+  const last = r2.per[p].rows[r2.per[p].rows.length - 1];
+  if (last && last.label === END_LABEL.foul3) toast('Third foul in a row: −16, re-rack, same player breaks');
+  saveLive(); renderScore();
+  if (navigator.vibrate) try { navigator.vibrate(12); } catch(_){}
+}
+function undo(){
+  if (!LIVE) return;
+  if (cur.racks){ cur.racks--; cur.runSoFar -= 14; if (!cur.racks){ cur.runSoFar = 0; cur.tableNow = undefined; } else cur.tableNow = 15; saveLive(); renderScore(); toast('Removed the last new rack'); return; }
+  const r = LIVE.innings.pop();
+  if (!r){ toast('Nothing to undo'); return; }
+  if (LIVE.status !== 'live'){ LIVE.status = 'live'; delete LIVE.finished; keepAwake(true); }
+  saveLive(); renderScore(); toast('Removed the last inning');
+}
+$('newRack').addEventListener('click', () => {
+  const { st } = replay(LIVE);
+  const onTable = curBalls(st);
+  cur.runSoFar += onTable - 1; cur.racks++; cur.tableNow = 15;
+  saveLive(); renderScore(); toast(`Re-racked: run so far ${cur.runSoFar}`);
+});
+
+/* keypad sheet */
+let sheetEnd = null;
+function openSheet(end){
+  const { st } = replay(LIVE), p = st.sh, onTable = curBalls(st);
+  sheetEnd = end;
+  const name = LIVE.names[p];
+  const T = { miss:['t-miss','Miss'], safe:['t-safe','Safety'], foul:['t-foul','Foul'], win:['t-win','Won the match'] }[end];
+  $('shTitle').innerHTML = `<span class="${T[0]}">${T[1]}</span> · ${esc(name)}`;
+  $('shQ').textContent = end === 'win' ? 'How many balls were left on the table when the match was won?' : 'How many balls are left on the table?';
+  const third = end === 'foul' && cur.runSoFar === 0 && st.fouls[p] === 2;
+  $('shWarn').hidden = !(end === 'foul');
+  $('shWarn').textContent = third ? `Third foul in a row if ${name} pocketed nothing this inning: −16 and a re-rack.` : 'The run before the foul counts, then −1.';
+  const keys = [];
+  for (let n = 0; n <= 15; n++){
+    const b = document.createElement('button'), run = cur.runSoFar + onTable - n;
+    b.disabled = n > onTable;
+    b.innerHTML = `<b>${n}</b><small>${n > onTable ? '' : 'run ' + run}</small>`;
+    b.setAttribute('aria-label', `${n} left, run of ${run}`);
+    b.addEventListener('click', () => { closeSheet(); addInning(sheetEnd, n); });
+    keys.push(b);
+  }
+  $('shKeys').replaceChildren(...keys);
+  $('scrim').hidden = false; $('sheet').hidden = false;
+}
+function closeSheet(){ $('scrim').hidden = true; $('sheet').hidden = true; }
+$('shCancel').addEventListener('click', closeSheet);
+$('scrim').addEventListener('click', closeSheet);
+document.querySelector(CFG.embedded ? '#book .ends' : '.ends').addEventListener('click', e => { const b = e.target.closest('[data-end]'); if (b && LIVE && LIVE.status === 'live') openSheet(b.dataset.end); });
+$('bfoulBtn').addEventListener('click', () => {
+  const { st } = replay(LIVE), p = st.sh;
+  $('bfTake').textContent = LIVE.names[1-p] + ' takes the table';
+  $('bfRe').textContent = LIVE.names[p] + ' breaks again';
+  $('scrim2').hidden = false; $('bfSheet').hidden = false;
+});
+const closeBf = () => { $('scrim2').hidden = true; $('bfSheet').hidden = true; };
+$('bfCancel').addEventListener('click', closeBf); $('scrim2').addEventListener('click', closeBf);
+$('bfTake').addEventListener('click', () => { closeBf(); addInning('bfoul', 15, { rebreak:false }); });
+$('bfRe').addEventListener('click', () => { closeBf(); addInning('bfoul', 15, { rebreak:true }); });
+$('undoBtn').addEventListener('click', undo);
+$('dUndo').addEventListener('click', undo);
+$('endBtn').addEventListener('click', () => { $('endAsk').hidden = false; $('endBtn').hidden = true; });
+$('endNo').addEventListener('click', () => { $('endAsk').hidden = true; $('endBtn').hidden = false; });
+$('endYes').addEventListener('click', () => { $('endAsk').hidden = true; $('endBtn').hidden = false; LIVE.status = 'ended'; LIVE.finished = Date.now(); keepAwake(false); saveLive(); toast('Match ended and saved to History'); LIVE = null; store.set(LIVE_KEY, null); renderScore(); });
+
+function renderScore(){
+  const mode = !LIVE ? 'setup' : LIVE.status === 'live' ? 'play' : LIVE.status === 'finished' ? 'done' : 'setup';
+  $('setup').hidden = mode !== 'setup'; $('play').hidden = mode !== 'play'; $('done').hidden = mode !== 'done';
+  if (mode === 'setup'){ renderSetup(); return; }
+  const m = LIVE, { st, per } = replay(m);
+  if (mode === 'play'){
+    $('pTitle').textContent = [m.title, `Race ${m.races[0]}–${m.races[1]}`].filter(Boolean).join(' · ');
+    for (const i of [0,1]){
+      $('pN' + i).textContent = m.names[i];
+      $('pS' + i).textContent = st.score[i];
+      $('pR' + i).textContent = '/' + m.races[i];
+      $('pF' + i).textContent = st.fouls[i] ? st.fouls[i] + (st.fouls[i] > 1 ? ' fouls' : ' foul') : '';
+      $('pSub' + i).textContent = `Inn ${per[i].inn} · HR ${per[i].hr} · Avg ${per[i].avg.toFixed(2)}`;
+      $('pl' + i).classList.toggle('at', st.sh === i);
+    }
+    $('tBalls').textContent = curBalls(st);
+    $('tInfo').innerHTML = `At the table: <b>${esc(m.names[st.sh])}</b>` + (cur.racks ? `<br><span class="runso">Run so far ${cur.runSoFar}+ (${cur.racks} re-rack${cur.racks > 1 ? 's' : ''})</span>` : '<br>Tap how the inning ended');
+    $('bfoulBtn').hidden = !st.openBreak || cur.racks > 0;
+    $('pLog').innerHTML = replay(m).seq.slice(-3).reverse().map(x => `<li><b>${esc(m.names[x.p])}</b> ${esc(x.row.label.toLowerCase())} · run ${x.row.run} · ${x.row.score}</li>`).join('') || '<li>After each inning, tap how it ended and how many balls were left.</li>';
+  } else {
+    const w = st.winner;
+    $('dWin').textContent = m.names[w] + ' wins';
+    $('dScore').textContent = `${m.names[0]} ${st.score[0]} – ${st.score[1]} ${m.names[1]}`;
+    $('dTable').innerHTML = statTable(m, per);
+  }
+}
+const pct = (a, b) => b ? Math.floor(a * 100 / b) + '%' : '–';
+function statRows(m, per){
+  return [
+    ['Total points', p => p.score],
+    ['Shots taken', p => p.taken],
+    ['Shots made', p => p.made, p => pct(p.made, p.taken)],
+    ['Misses', p => p.miss, p => pct(p.miss, p.taken)],
+    ['Good misses', p => p.gm, p => pct(p.gm, p.miss)],
+    ['Safeties', p => p.safe, p => pct(p.safe, p.taken)],
+    ['Good safeties', p => p.gs, p => pct(p.gs, p.safe)],
+    ['Fouls', p => p.foul, p => pct(p.foul, p.taken)],
+    ['Good fouls', p => p.gf, p => pct(p.gf, p.foul)],
+    ['High run', p => p.hr],
+    ['Average run', p => p.avg.toFixed(1)],
+    ['Innings', p => p.inn]
+  ];
+}
+function statTable(m, per){
+  const cell = (f, g, p) => `${f(p)}${g ? ` <small>${g(p)}</small>` : ''}`;
+  return `<table><thead><tr><th></th><th>${esc(m.names[0])}</th><th>${esc(m.names[1])}</th></tr></thead><tbody>${statRows(m, per).map(([l, f, g]) => `<tr><td>${l}</td><td>${cell(f, g, per[0])}</td><td>${cell(f, g, per[1])}</td></tr>`).join('')}</tbody></table>`;
+}
+function renderSetup(){
+  renderNudges();
+  const d = store.get('sb:last') || { title:'', names:['',''], races:[100,100] };
+  if (!$('sTitle').value && d.title) $('sTitle').value = d.title;
+  for (const i of [0,1]){
+    if (!$('sName' + i).value && d.names[i]) $('sName' + i).value = d.names[i];
+    if (!$('sRace' + i).value) $('sRace' + i).value = d.races[i] || 100;
+  }
+  if (breakSel === null) breakSel = 0;
+  renderBreak();
+  const dr = store.get(LIVE_KEY);
+  const can = dr && dr.status === 'live' && (!LIVE || LIVE.id !== dr.id);
+  $('resume').hidden = !can;
+  if (can){ const s = summarize(dr); $('resumeText').innerHTML = `Match in progress: <b>${esc(dr.names[0])} ${s.score[0]} – ${s.score[1]} ${esc(dr.names[1])}</b>`; }
+}
+function renderBreak(){
+  for (const i of [0,1]){
+    const n = $('sName' + i).value.trim() || 'Player ' + (i+1);
+    $('sB' + i).textContent = n + ' breaks'; $('sB' + i).setAttribute('aria-pressed', String(breakSel === i));
+    $('sStartL' + i).textContent = n + ' starts on';
+  }
+}
+function renderNames(){
+  const c = new Map();
+  for (const m of MATCHES) for (const n of m.names || []){ const k = normName(n); if (k) c.set(k, { n, c:(c.get(k)?.c || 0) + 1 }); }
+  $('names').replaceChildren(...[...c.values()].sort((a,b) => b.c - a.c).map(x => { const o = document.createElement('option'); o.value = x.n; return o; }));
+}
+$('sBreak').addEventListener('click', e => { const b = e.target.closest('[data-b]'); if (b){ breakSel = +b.dataset.b; renderBreak(); } });
+[$('sName0'), $('sName1')].forEach(el => el.addEventListener('input', renderBreak));
+$('sStart').addEventListener('click', () => {
+  const names = [0,1].map(i => $('sName' + i).value.trim() || 'Player ' + (i+1));
+  if (normName(names[0]) === normName(names[1])){ toast('Give the two players different names'); return; }
+  const races = [0,1].map(i => Math.max(1, Math.round(+$('sRace' + i).value) || 100));
+  const start = [0,1].map(i => Math.round(+$('sStart' + i).value) || 0);
+  const title = $('sTitle').value.trim();
+  store.set('sb:last', { title, names, races });
+  startMatch({ title, names, races, start, breaker: breakSel });
+  $('sStart0').value = 0; $('sStart1').value = 0;
+});
+$('resumeBtn').addEventListener('click', () => { LIVE = store.get(LIVE_KEY); cur = LIVE.cur || { racks:0, runSoFar:0 }; keepAwake(true); merge(); renderScore(); });
+$('dPdf').addEventListener('click', () => exportPdf(LIVE));
+$('dHist').addEventListener('click', () => { openId = LIVE && LIVE.id; show('history'); });
+$('dRematch').addEventListener('click', () => { const m = LIVE; startMatch({ title:m.title, names:[...m.names], races:[...m.races], start:[0,0], breaker:1 - m.breaker }); });
+$('dNew').addEventListener('click', () => { LIVE = null; store.set(LIVE_KEY, null); renderScore(); });
+
+/* ---------- match report: PDF + comma-delimited data (sample-sheet layout) ---------- */
+const p2 = n => String(n).padStart(2, '0');
+function stamp(ts, sep){ const d = new Date(ts); return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}${sep}${p2(d.getHours())}${sep === ' ' ? ':' : ''}${p2(d.getMinutes())}${sep === ' ' ? ':' : ''}${p2(d.getSeconds())}`; }
+function report(m){
+  const { st, per } = replay(m);
+  const start = m.start || [0,0], spot = [0,1].map(i => Math.max(...m.races) - m.races[i]);
+  const hdr = [0,1].map(i => `${m.names[i]} (${st.score[i]})`);
+  const setup = [['Starting Scores:', start[0], start[1]], ['Ending Scores:', m.races[0], m.races[1]], ['Spot:', spot[0], spot[1]]];
+  const title = l => l.replace(/\b\w/g, c => c.toUpperCase());
+  const stats = statRows(m, per).filter(r => r[0] !== 'Innings').map(([l, f, g]) => [title(l) + ':', f(per[0]), g ? '(' + g(per[0]) + ')' : '', f(per[1]), g ? '(' + g(per[1]) + ')' : '']);
+  const n = Math.max(per[0].rows.length, per[1].rows.length), rows = [];
+  for (let i = 0; i < n; i++){
+    const a = per[0].rows[i], b = per[1].rows[i];
+    rows.push([i+1, a ? a.label : '', a ? a.run : '', a ? a.score : '', b ? b.score : '', b ? b.run : '', b ? b.label : '', a && a.good, b && b.good]);
+  }
+  return { title: m.title || '', when: stamp(m.created, ' '), hdr, setup, stats, rows, st };
+}
+function csvText(m){
+  const R = report(m), q = v => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  const L = [R.title, R.when, R.hdr.map(q).join(',')];
+  for (const s of R.setup) L.push([s[0], s[1], s[2]].map(q).join(','));
+  for (const s of R.stats) L.push([s[0], s[1], s[2] || ' ', s[3], s[4]].map(q).join(','));
+  for (const r of R.rows) L.push(r.slice(0, 7).map(q).join(','));
+  return L.join('\n') + '\n';
+}
+const fileBase = m => { const s = replay(m).st.score; return `${m.names[0]}_${s[0]}_vs_${m.names[1]}_${s[1]}_${stamp(m.created, '_')}`.replace(/[^A-Za-z0-9_()-]+/g, '-'); };
+function exportPdf(m){
+  if (!m) return;
+  if (!(window.jspdf && window.jspdf.jsPDF)){ toast("The PDF maker didn't load. Check your connection and try again."); return; }
+  const R = report(m), doc = new window.jspdf.jsPDF({ unit:'pt', format:'a4' });
+  const W = 595, H = 842, TOP = 56, BOT = 790, C = W/2;
+  let y = TOP;
+  doc.setFont('helvetica', 'normal');
+  const t = (s, x, yy, al, size, bold) => { doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size || 10.5); doc.text(String(s), x, yy, al ? { align: al } : undefined); };
+  const need = h => { if (y + h > BOT){ foot(); doc.addPage(); y = TOP; return true; } return false; };
+  let page = 1;
+  const foot = () => { t(`${R.hdr[0]} vs ${R.hdr[1]} · ${R.when} · page ${page++}`, C, H - 28, 'center', 8); };
+  if (R.title) { t(R.title, C, y, 'center', 13, true); y += 18; }
+  t(R.when, C, y, 'center', 10.5); y += 20;
+  t(R.hdr[0], 150, y, 'center', 12, true); t('vs', C, y, 'center', 11); t(R.hdr[1], W - 150, y, 'center', 12, true); y += 34;
+  t('Setup', 72, y, null, 11.5, true); y += 18;
+  for (const s of R.setup){ t(s[0], 82, y); t(s[1], 268, y, 'right'); t('|', C, y, 'center'); t(s[2], 312, y); y += 16; }
+  y += 14; t('Stats', 72, y, null, 11.5, true); y += 18;
+  for (const s of R.stats){ t(s[0], 82, y); t(s[1], 232, y, 'right'); t(s[2], 268, y, 'center'); t('|', C, y, 'center'); t(s[3], 312, y); t(s[4], 360, y, 'center'); y += 16; }
+  y += 14; t('By Inning', 72, y, null, 11.5, true); y += 18;
+  const head = () => { t('Run', 232, y, 'right', 9.5, true); t('Score', 282, y, 'right', 9.5, true); t('|', C, y, 'center'); t('Score', 312, y, null, 9.5, true); t('Run', 372, y, 'right', 9.5, true); y += 15; };
+  head();
+  for (const r of R.rows){
+    if (need(15)) head();
+    t(r[0], 72, y, null, 10); t(r[1], 102, y, null, 10); t(r[2], 232, y, 'right', 10); t(r[3], 282, y, 'right', 10); t('|', C, y, 'center', 10);
+    t(r[4], 312, y, null, 10); t(r[5], 372, y, 'right', 10); t(r[6], 402, y, null, 10); y += 15;
+  }
+  y += 24; need(40);
+  t('******* 14.1 Scorebook *******', C, y, 'center', 9); y += 26;
+  need(30); t('****** comma delimited match data *******', C, y, 'center', 9); y += 20;
+  for (const line of csvText(m).trim().split('\n')){ need(13); t(line, 72, y, null, 8.5); y += 12; }
+  foot();
+  saveFile(fileBase(m) + '.pdf', doc.output('blob'));
+}
+
+/* ---------- downloads ---------- */
+let dl = null;
+const dlNS = () => dl || (dl = (window.claude && typeof window.claude.use === 'function') ? window.claude.use('downloads').catch(() => null) : Promise.resolve(null));
+async function saveFile(name, data){
+  const d = await dlNS();
+  if (d){
+    try { await d.save({ filename:name, data }); toast('Saved ' + name); }
+    catch(e){ toast(e && e.code === 'declined' ? 'Save cancelled' : "Couldn't save the file here"); }
+    return;
+  }
+  const blob = data instanceof Blob ? data : new Blob([data], { type: /\.json$/.test(name) ? 'application/json' : /\.csv$/.test(name) ? 'text/csv' : 'text/plain' });
+  if (matchMedia('(pointer:coarse)').matches && navigator.canShare){
+    try {
+      const file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
+      if (navigator.canShare({ files:[file] })){ await navigator.share({ files:[file], title:name }); toast('Shared ' + name); return; }
+    } catch(e){ if (e && e.name === 'AbortError'){ toast('Cancelled'); return; } }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Saved ' + name);
+}
+
+/* ---------- history & progressive stats ---------- */
+let openId = null, delAsk = null;
+const fmtDate = ts => new Date(ts).toLocaleDateString(undefined, { day:'numeric', month:'short', year:'2-digit' });
+function players(){
+  const c = new Map();
+  for (const m of MATCHES) for (const n of m.names || []){ const k = normName(n); if (k) c.set(k, { n, c:(c.get(k)?.c || 0) + 1 }); }
+  return [...c.values()].sort((a,b) => b.c - a.c).map(x => x.n);
+}
+function unbacked(){ const n = MATCHES.filter(m => m.status === 'finished' || m.status === 'ended').length; return n - (+store.get('sb:backedUp') || 0); }
+function renderNudges(){
+  if (!HOST) return;
+  const n = unbacked(), show = n >= 5;
+  const txt = `${n} match${n === 1 ? '' : 'es'} since your last backup. Save a backup file somewhere safe (Files, iCloud Drive, email) in case this phone is lost or reset.`;
+  $('hNudge').hidden = !show; $('sNudge').hidden = !show; $('hNudgeText').textContent = txt; $('sNudgeText').textContent = txt;
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  $('installTip').hidden = standalone || !/iPhone|iPad|Android/i.test(navigator.userAgent) || !!store.get('sb:installTipOff');
+}
+function renderHistory(){
+  renderNudges();
+  const names = players(), sel = $('hPlayer');
+  let me = store.get('sb:me') || '';
+  if (!names.some(n => normName(n) === normName(me))) me = names[0] || '';
+  sel.replaceChildren(...(names.length ? names : ['No players yet']).map(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; return o; }));
+  sel.value = me; sel.disabled = !names.length;
+  renderStats(me); renderList();
+}
+function series(name){
+  const k = normName(name), out = [];
+  for (const m of MATCHES.filter(m => m.status === 'finished' || m.status === 'ended').sort((a,b) => a.created - b.created)){
+    const i = (m.names || []).findIndex(n => normName(n) === k); if (i < 0) continue;
+    const { per } = replay(m); out.push({ m, i, p: per[i], opp: m.names[1-i], date: m.created });
+  }
+  return out;
+}
+function renderStats(name){
+  const S = name ? series(name) : [], fin = S.filter(x => x.m.status === 'finished'), wins = fin.filter(x => x.p.won).length;
+  const made = S.reduce((s, x) => s + x.p.made, 0), inn = S.reduce((s, x) => s + x.p.inn, 0);
+  const last = S.slice(-10), lm = last.reduce((s, x) => s + x.p.made, 0), li = last.reduce((s, x) => s + x.p.inn, 0);
+  const best = S.reduce((b, x) => x.p.hr > (b ? b.p.hr : -1) ? x : b, null);
+  const tk = S.reduce((s, x) => s + x.p.taken, 0);
+  const tile = (l, v, s) => `<div class="tile"><span>${l}</span><b>${v}</b>${s ? `<small>${s}</small>` : ''}</div>`;
+  $('hTiles').innerHTML = S.length ? [
+    tile('Matches', fin.length, S.length > fin.length ? `+${S.length - fin.length} ended early` : ''),
+    tile('Won', fin.length ? Math.round(wins / fin.length * 100) + '%' : '–', `${wins} of ${fin.length}`),
+    tile('Average run', inn ? (made / inn).toFixed(2) : '–', 'balls per inning, all matches'),
+    tile('Last 10', li ? (lm / li).toFixed(2) : '–', last.length < 10 ? `${last.length} match${last.length === 1 ? '' : 'es'} so far` : 'average run'),
+    tile('Shots made', tk ? Math.floor(made * 100 / tk) + '%' : '–', 'of shots taken'),
+    tile('Best run', best ? best.p.hr : '–', best ? 'vs ' + esc(best.opp) + ', ' + fmtDate(best.date) : '')
+  ].join('') : '<div class="empty" style="grid-column:1/-1">No finished matches yet. Score one on the Score tab and its stats appear here.</div>';
+  chart($('chAvg'), S.map((x, j) => ({ x:j, y: +x.p.avg.toFixed(2), lab: `${fmtDate(x.date)} vs ${x.opp}`, val: x.p.avg.toFixed(2) })), { kind:'line', whole:false });
+  chart($('chHr'), S.map((x, j) => ({ x:j, y: x.p.hr, lab: `${fmtDate(x.date)} vs ${x.opp}`, val: String(x.p.hr) })), { kind:'bar', whole:true });
+}
+function niceScale(v, whole){
+  if (!(v > 0)) v = 1;
+  const raw = v / 4, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  let step = (whole ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10]).map(k => k*p).find(x => x >= raw);
+  if (whole) step = Math.max(1, Math.round(step));
+  return { step, max: Math.ceil(v / step) * step };
+}
+function chart(fig, pts, opt){
+  const box = fig.querySelector('.plot');
+  if (!pts.length || (opt.kind === 'line' && pts.length < 2)){ box.innerHTML = '<div class="none">Needs at least two finished matches</div>'; return; }
+  const W = Math.max(280, Math.round(box.clientWidth || 600)), H = 180, L = 34, R = 10, T = 10, B = 24;
+  const sc = niceScale(Math.max(...pts.map(p => p.y)), opt.whole), max = sc.max, n = pts.length, band = (W - L - R) / n;
+  const X = i => opt.kind === 'bar' ? L + band * (i + 0.5) : L + (W - L - R) * i / (n - 1);
+  const Y = v => T + (H - T - B) * (1 - v / max);
+  let g = '';
+  for (let v = 0; v <= max + 1e-9; v += sc.step){
+    const y = Y(v);
+    g += `<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-width="1"/><text x="${L-6}" y="${y}" fill="var(--dim)" font-size="11" text-anchor="end" dominant-baseline="central" font-family="var(--mono)">${+v.toFixed(2)}</text>`;
+  }
+  const dl = s => esc(s.split(' vs ')[0]);
+  g += `<text x="${X(0)}" y="${H-6}" fill="var(--dim)" font-size="11" text-anchor="${opt.kind === 'bar' ? 'middle' : 'start'}" font-family="var(--mono)">${dl(pts[0].lab)}</text>`;
+  if (n > 1) g += `<text x="${X(n-1)}" y="${H-6}" fill="var(--dim)" font-size="11" text-anchor="${opt.kind === 'bar' ? 'middle' : 'end'}" font-family="var(--mono)">${dl(pts[n-1].lab)}</text>`;
+  if (opt.kind === 'bar'){
+    const bw = Math.max(3, Math.min(28, band - 4));
+    for (const p of pts){ const x = X(p.x) - bw/2, y = Y(p.y), h = Math.max(0, Y(0) - y), r = Math.min(4, bw/2, h); if (h > 0) g += `<path d="M${x},${Y(0)} V${y+r} Q${x},${y} ${x+r},${y} H${x+bw-r} Q${x+bw},${y} ${x+bw},${y+r} V${Y(0)} Z" fill="var(--chalk)"/>`; }
+  } else {
+    g += `<polyline points="${pts.map(p => X(p.x) + ',' + Y(p.y)).join(' ')}" fill="none" stroke="var(--chalk)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (n <= 40) for (const p of pts) g += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="4" fill="var(--chalk)" stroke="var(--panel)" stroke-width="2"/>`;
+  }
+  g += `<line class="hx" x1="0" x2="0" y1="${T}" y2="${H-B}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(fig.querySelector('figcaption').textContent)}">${g}</svg><div class="tip" hidden></div>`;
+  const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), hx = svg.querySelector('.hx');
+  const move = e => {
+    const r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) / r.width * W;
+    let best = 0, bd = 1e9; pts.forEach((p, i) => { const d = Math.abs(X(p.x) - sx); if (d < bd){ bd = d; best = i; } });
+    const p = pts[best], px = X(p.x) / W * r.width, py = Y(p.y) / H * r.height;
+    hx.setAttribute('x1', X(p.x)); hx.setAttribute('x2', X(p.x)); hx.setAttribute('visibility', 'visible');
+    tip.hidden = false; tip.innerHTML = `<b>${esc(p.val)}</b><br>${esc(p.lab)}`;
+    tip.style.left = Math.min(Math.max(px, 60), r.width - 60) + 'px'; tip.style.top = (py + 8) + 'px';
+  };
+  svg.addEventListener('pointermove', move); svg.addEventListener('pointerdown', move);
+  svg.addEventListener('pointerleave', () => { tip.hidden = true; hx.setAttribute('visibility', 'hidden'); });
+}
+function renderList(){
+  const box = $('hList');
+  $('hCount').textContent = MATCHES.length ? MATCHES.length + ' saved' : '';
+  if (!MATCHES.length){ box.innerHTML = '<div class="empty">Matches you score are saved here, with full stats and a PDF scoresheet.</div>'; return; }
+  const els = [];
+  for (const m of MATCHES){
+    const s = summarize(m), w = s.winner;
+    const b = document.createElement('button'); b.className = 'mrow'; b.setAttribute('aria-expanded', String(openId === m.id));
+    const nm = i => `<b class="${w === i ? 'w' : ''}">${esc(m.names[i])}</b>`;
+    const badge = m.status === 'live' ? '<span class="badge live">LIVE</span>' : m.status === 'ended' ? '<span class="badge ended">ENDED</span>' : '';
+    b.innerHTML = `<span class="d">${fmtDate(m.created)}</span><span class="who">${nm(0)} ${s.score[0]} – ${s.score[1]} ${nm(1)}${badge}</span><span class="r">Inn ${Math.max(...s.inn)} · HR ${Math.max(...s.hr)}</span>`;
+    b.addEventListener('click', () => { openId = openId === m.id ? null : m.id; delAsk = null; renderList(); });
+    els.push(b);
+    if (openId === m.id) els.push(detail(m));
+  }
+  box.replaceChildren(...els);
+}
+function detail(m){
+  const { per } = replay(m), R = report(m);
+  const d = document.createElement('div'); d.className = 'detail';
+  const dur = m.finished ? Math.round((m.finished - m.created) / 60000) : null;
+  d.innerHTML = `<div class="meta">${esc(m.title ? m.title + ' · ' : '')}${new Date(m.created).toLocaleString()} · race ${m.races[0]}–${m.races[1]}${(m.start || [0,0]).some(Boolean) ? ` · started ${m.start[0]}–${m.start[1]}` : ''} · ${esc(m.names[m.breaker])} broke${dur ? ` · ${dur} min` : ''}${m.status === 'ended' ? ' · ended early' : ''}</div>
+    <div class="dt">${statTable(m, per)}</div>
+    <div class="inn"><table><thead><tr><th>#</th><th style="text-align:left">${esc(m.names[0])}</th><th>Run</th><th>Score</th><th class="mid">Score</th><th>Run</th><th style="text-align:left">${esc(m.names[1])}</th></tr></thead><tbody>${R.rows.map(r => `<tr><td>${r[0]}</td><td class="e">${esc(r[1])}${r[7] ? ' ✓' : ''}</td><td>${r[2]}</td><td>${r[3]}</td><td class="mid">${r[4]}</td><td>${r[5]}</td><td class="e">${esc(r[6])}${r[8] ? ' ✓' : ''}</td></tr>`).join('')}</tbody></table></div>
+    <div class="acts">
+      <button class="btn primary" data-a="pdf">Download PDF</button>
+      <button class="btn" data-a="csv">Download CSV</button>
+      ${CFG.syncVideo ? '<button class="btn" data-a="video">Sync to a video</button>' : ''}
+      ${m.status === 'live' ? '<button class="btn" data-a="resume">Continue scoring</button>' : ''}
+      ${delAsk === m.id ? '<span class="meta">Delete this match for good?</span><button class="btn danger" data-a="del2">Delete</button><button class="btn" data-a="keep">Keep</button>' : '<button class="btn danger" data-a="del">Delete</button>'}
+    </div>`;
+  d.addEventListener('click', e => {
+    const a = e.target.closest('[data-a]'); if (!a) return;
+    switch(a.dataset.a){
+      case 'pdf': exportPdf(m); break;
+      case 'csv': saveFile(fileBase(m) + '.csv', csvText(m)); break;
+      case 'video': if (!m.innings.length || !m.innings[0].ts){ toast('This match has no innings recorded yet, so there is nothing to line up with a video'); break; } CFG.syncVideo(m.id); break;
+      case 'resume': LIVE = JSON.parse(JSON.stringify(m)); cur = LIVE.cur || { racks:0, runSoFar:0 }; store.set(LIVE_KEY, LIVE); keepAwake(true); show('score'); break;
+      case 'del': delAsk = m.id; renderList(); break;
+      case 'keep': delAsk = null; renderList(); break;
+      case 'del2': delAsk = null; if (LIVE && LIVE.id === m.id){ LIVE = null; store.set(LIVE_KEY, null); } remove(m.id); toast('Match deleted'); break;
+    }
+  });
+  return d;
+}
+$('hPlayer').addEventListener('change', () => { store.set('sb:me', $('hPlayer').value); renderStats($('hPlayer').value); });
+$('hCsv').addEventListener('click', () => {
+  const list = MATCHES.filter(m => m.innings.length).sort((a,b) => a.created - b.created);
+  if (!list.length){ toast('No matches to export yet'); return; }
+  const q = v => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  const head = ['date','title','status','player1','race1','start1','points1','innings1','shots_made1','shots_taken1','misses1','good_misses1','safeties1','good_safeties1','fouls1','good_fouls1','high_run1','average_run1','player2','race2','start2','points2','innings2','shots_made2','shots_taken2','misses2','good_misses2','safeties2','good_safeties2','fouls2','good_fouls2','high_run2','average_run2','winner'];
+  const rows = [head.join(',')];
+  for (const m of list){
+    const { st, per } = replay(m), s = m.start || [0,0];
+    const P = i => [m.names[i], m.races[i], s[i], per[i].score, per[i].inn, per[i].made, per[i].taken, per[i].miss, per[i].gm, per[i].safe, per[i].gs, per[i].foul, per[i].gf, per[i].hr, per[i].avg.toFixed(2)];
+    rows.push([stamp(m.created, ' '), m.title || '', m.status, ...P(0), ...P(1), st.winner === null ? '' : m.names[st.winner]].map(q).join(','));
+  }
+  saveFile('straight-pool-matches.csv', rows.join('\n') + '\n');
+});
+function backup(){
+  if (!MATCHES.length){ toast('No matches to back up yet'); return; }
+  store.set('sb:backedUp', MATCHES.filter(m => m.status === 'finished' || m.status === 'ended').length); renderNudges();
+  saveFile('straight-pool-backup-' + stamp(Date.now(), '_').slice(0, 10) + '.json', JSON.stringify({ app:'straight-pool-scorebook', format:2, exported:new Date().toISOString(), matches:MATCHES.map(m => { const c = { ...m }; delete c.sum; return c; }) }, null, 1));
+}
+$('hJson').addEventListener('click', backup);
+[$('hNudgeBtn'), $('sNudgeBtn')].forEach(el => el.addEventListener('click', backup));
+$('installX').addEventListener('click', () => { store.set('sb:installTipOff', true); renderNudges(); });
+$('hImport').addEventListener('click', () => $('hImportFile').click());
+$('hImportFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let data; try { data = JSON.parse(await f.text()); } catch(_){ toast("That file isn't a backup from this app"); return; }
+  const list = data && Array.isArray(data.matches) ? data.matches.filter(m => m && m.id && Array.isArray(m.innings) && Array.isArray(m.names)) : [];
+  if (!list.length){ toast("That file isn't a backup from this app"); return; }
+  let added = 0;
+  for (const m of list){ if (MATCHES.some(x => x.id === m.id)) continue; m.sum = summarize(m); await push(m); added++; }
+  merge(); toast(added ? `Restored ${added} match${added === 1 ? '' : 'es'}` : 'Every match in that backup is already here');
+});
+
+/* ---------- tabs ---------- */
+function show(v){
+  VIEW = v;
+  $('vScore').hidden = v !== 'score'; $('vHistory').hidden = v !== 'history';
+  if (!CFG.embedded) document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === v)));
+  if (v === 'score') renderScore(); else renderHistory();
+  window.scrollTo(0, 0);
+}
+if (!CFG.embedded) document.querySelector('.bar').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) show(b.dataset.view); });
+let rsT; window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { if (VIEW === 'history') renderStats($('hPlayer').value); }, 150); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape'){ closeSheet(); closeBf(); } });
+
+/* ---------- boot ---------- */
+{ const d = store.get(LIVE_KEY); if (d && (d.status === 'live' || d.status === 'finished')){ LIVE = d; cur = d.cur || { racks:0, runSoFar:0 }; if (d.status === 'live') keepAwake(true); } }
+setSync('busy', 'Connecting…');
+if (!CFG.embedded) show('score'); connect(); dlNS();
+window.__sb = window.__book = { replay, report, csvText, show, get VIEW(){ return VIEW; }, get LIVE(){ return LIVE; }, get MATCHES(){ return MATCHES; } };
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return; reloaded = true;
+    const t = document.getElementById('toast'); if (t){ t.textContent = 'App updated'; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 2400); }
+  });
+}
+</script>
+</body>
+</html>

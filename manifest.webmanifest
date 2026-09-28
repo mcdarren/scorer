@@ -1,0 +1,16 @@
+{
+  "name": "14.1 Scorebook",
+  "short_name": "14.1 Scorebook",
+  "description": "Score straight pool by inning, keep your match history and stats, and export PDF scoresheets.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1214",
+  "theme_color": "#0f1214",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
