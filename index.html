@@ -131,6 +131,12 @@ button{cursor:pointer;touch-action:manipulation}
 .keys button small{font:11px var(--mono);color:var(--muted)}
 .keys button:disabled{opacity:.25}
 .keys button:active:not(:disabled){transform:scale(.96)}
+.rkopts{display:grid;gap:8px}
+.rkopt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:14px;text-align:left}
+.rkopt b{font:700 20px var(--display);letter-spacing:.02em}
+.rkopt small{font-size:13px;color:var(--muted)}
+.rkopt.def{border-color:var(--chalk);background:color-mix(in srgb,var(--chalk) 10%,var(--panel2))}
+.rkopt.def b{color:var(--chalk)}
 .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 
 /* done */
@@ -244,7 +250,7 @@ button{cursor:pointer;touch-action:manipulation}
         <button class="win" data-end="win" id="winBtn">Won the match</button>
       </div>
       <div class="minor">
-        <button class="btn" id="bfoulBtn">Break foul</button>
+        <button class="btn" id="bfoulBtn">Illegal break</button>
         <button class="btn" id="undoBtn">Undo</button>
         <button class="btn" id="endBtn">End match early</button>
       </div>
@@ -293,10 +299,17 @@ button{cursor:pointer;touch-action:manipulation}
   <div class="keys" id="shKeys"></div>
   <button class="btn" id="shCancel">Cancel</button>
 </div>
+<div class="scrim" id="scrim3" hidden></div>
+<div class="sheet" id="rkSheet" hidden role="dialog" aria-modal="true" aria-labelledby="rkTitle">
+  <h3 id="rkTitle">New rack</h3>
+  <p class="q">How many balls were left on the table when the rack was re-racked?</p>
+  <div class="rkopts"><button class="rkopt def" id="rk1"></button><button class="rkopt" id="rk0"></button></div>
+  <button class="btn" id="rkCancel">Cancel</button>
+</div>
 <div class="scrim" id="scrim2" hidden></div>
 <div class="sheet" id="bfSheet" hidden role="dialog" aria-modal="true" aria-labelledby="bfTitle">
-  <h3 id="bfTitle"><span class="t-foul">Break foul</span> · −2</h3>
-  <p class="q">The opponent chooses: take the table as it lies, or have the breaker break again.</p>
+  <h3 id="bfTitle"><span class="t-foul">Illegal break</span> · −2</h3>
+  <p class="q">The break didn't pocket a called ball or send the cue ball and two object balls to a cushion. The opponent chooses: take the table as it lies, or have the breaker break again.</p>
   <div class="two"><button class="btn" id="bfTake"></button><button class="btn" id="bfRe"></button></div>
   <button class="btn" id="bfCancel">Cancel</button>
 </div>
@@ -322,7 +335,7 @@ function toast(msg){ const el = $('toast'); el.textContent = msg; el.classList.a
    { end:'miss'|'safe'|'foul'|'bfoul'|'win', run, left, racks, good, rebreak, ts }
    Games are registered in GAMES so 8-ball / 9-ball can be added later.
    ===================================================================== */
-const END_LABEL = { miss:'Miss', safe:'Safety', foul:'Foul(-1)', foul3:'Foul(-16)', bfoul:'Break foul(-2)', win:'End Match' };
+const END_LABEL = { miss:'Miss', safe:'Safety', foul:'Foul(-1)', foul3:'Foul(-16)', bfoul:'Illegal Break(-2)', win:'End Match', open:'At the table' };
 function replay(m){
   const st = { score:[...(m.start || [0,0])], fouls:[0,0], sh:m.breaker, balls:15, winner:null, openBreak:true };
   const per = [0,1].map(() => ({ runs:[], made:0, miss:0, safe:0, foul:0, gm:0, gs:0, gf:0, hr:0, rows:[] })), seq = [];
@@ -489,18 +502,28 @@ function addInning(end, left, extra){
 }
 function undo(){
   if (!LIVE) return;
-  if (cur.racks){ cur.racks--; cur.runSoFar -= 14; if (!cur.racks){ cur.runSoFar = 0; cur.tableNow = undefined; } else cur.tableNow = 15; saveLive(); renderScore(); toast('Removed the last new rack'); return; }
+  if (cur.racks){ const a = (cur.adds || []).pop(); cur.racks--; if (a){ cur.runSoFar -= a.add; cur.tableNow = a.prev; } else { cur.runSoFar = Math.max(0, cur.runSoFar - 14); cur.tableNow = cur.racks ? 15 : undefined; } if (!cur.racks){ cur.runSoFar = 0; cur.tableNow = undefined; cur.adds = []; } saveLive(); renderScore(); toast('Removed the last new rack'); return; }
   const r = LIVE.innings.pop();
   if (!r){ toast('Nothing to undo'); return; }
   if (LIVE.status !== 'live'){ LIVE.status = 'live'; delete LIVE.finished; keepAwake(true); }
   saveLive(); renderScore(); toast('Removed the last inning');
 }
-$('newRack').addEventListener('click', () => {
-  const { st } = replay(LIVE);
-  const onTable = curBalls(st);
-  cur.runSoFar += onTable - 1; cur.racks++; cur.tableNow = 15;
+function doRerack(left){
+  const { st } = replay(LIVE), onTable = curBalls(st), add = Math.max(0, onTable - left);
+  (cur.adds || (cur.adds = [])).push({ add, prev: cur.tableNow });
+  cur.runSoFar += add; cur.racks++; cur.tableNow = 15;
   saveLive(); renderScore(); toast(`Re-racked: run so far ${cur.runSoFar}`);
+}
+$('newRack').addEventListener('click', () => {
+  const { st } = replay(LIVE), onTable = curBalls(st);
+  $('rk1').innerHTML = `<b>1 ball left</b><small>the break ball stays · run so far ${cur.runSoFar + Math.max(0, onTable - 1)}</small>`;
+  $('rk0').innerHTML = `<b>0 balls left</b><small>the last two went down together · run so far ${cur.runSoFar + onTable}</small>`;
+  $('scrim3').hidden = false; $('rkSheet').hidden = false; $('rk1').focus();
 });
+const closeRk = () => { $('scrim3').hidden = true; $('rkSheet').hidden = true; };
+$('rk1').addEventListener('click', () => { closeRk(); doRerack(1); });
+$('rk0').addEventListener('click', () => { closeRk(); doRerack(0); });
+$('rkCancel').addEventListener('click', closeRk); $('scrim3').addEventListener('click', closeRk);
 
 /* keypad sheet */
 let sheetEnd = null;
@@ -907,7 +930,7 @@ function show(v){
 }
 if (!CFG.embedded) document.querySelector('.bar').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) show(b.dataset.view); });
 let rsT; window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setTimeout(() => { if (VIEW === 'history') renderStats($('hPlayer').value); }, 150); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape'){ closeSheet(); closeBf(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape'){ closeSheet(); closeBf(); closeRk(); } });
 
 /* ---------- boot ---------- */
 { const d = store.get(LIVE_KEY); if (d && (d.status === 'live' || d.status === 'finished')){ LIVE = d; cur = d.cur || { racks:0, runSoFar:0 }; if (d.status === 'live') keepAwake(true); } }
