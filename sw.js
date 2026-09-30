@@ -1,5 +1,5 @@
 /* Offline support for the 14.1 Scorebook. Version changes whenever any app file changes. */
-const CACHE = 'scorebook-ec1247d94e';
+const CACHE = 'scorebook-a31fa78622';
 const ASSETS = ['./', 'index.html', 'store.js', 'jspdf.umd.min.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

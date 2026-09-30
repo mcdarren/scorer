@@ -678,11 +678,19 @@ function report(m){
     const a = per[0].rows[i], b = per[1].rows[i];
     rows.push([i+1, a ? a.label : '', a ? a.run : '', a ? a.score : '', b ? b.score : '', b ? b.run : '', b ? b.label : '', a && a.good, b && b.good]);
   }
-  return { title: m.title || '', when: stamp(m.created, ' '), hdr, setup, stats, rows, st };
+  const inn = m.innings || [], endTs = m.finished || (inn.length && inn[inn.length-1].ts) || null;
+  let duration = '';
+  if (endTs && m.created && endTs > m.created){
+    const mins = Math.round((endTs - m.created) / 60000);
+    duration = (mins >= 60 ? `${Math.floor(mins/60)}h ${String(mins % 60).padStart(2,'0')}m` : `${mins} min`) + (m.status === 'live' ? ' so far' : '');
+  }
+  return { title: m.title || '', when: stamp(m.created, ' '), duration, hdr, setup, stats, rows, st };
 }
 function csvText(m){
   const R = report(m), q = v => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
-  const L = [R.title, R.when, R.hdr.map(q).join(',')];
+  const L = [R.title, R.when];
+  if (R.duration) L.push('Duration:,' + q(R.duration));
+  L.push(R.hdr.map(q).join(','));
   for (const s of R.setup) L.push([s[0], s[1], s[2]].map(q).join(','));
   for (const s of R.stats) L.push([s[0], s[1], s[2] || ' ', s[3], s[4]].map(q).join(','));
   for (const r of R.rows) L.push(r.slice(0, 7).map(q).join(','));
@@ -701,7 +709,8 @@ function exportPdf(m){
   let page = 1;
   const foot = () => { t(`${R.hdr[0]} vs ${R.hdr[1]} · ${R.when} · page ${page++}`, C, H - 28, 'center', 8); };
   if (R.title) { t(R.title, C, y, 'center', 13, true); y += 18; }
-  t(R.when, C, y, 'center', 10.5); y += 20;
+  t(R.when, C, y, 'center', 10.5); y += R.duration ? 15 : 20;
+  if (R.duration){ t('Duration: ' + R.duration, C, y, 'center', 10.5); y += 20; }
   t(R.hdr[0], 150, y, 'center', 12, true); t('vs', C, y, 'center', 11); t(R.hdr[1], W - 150, y, 'center', 12, true); y += 34;
   t('Setup', 72, y, null, 11.5, true); y += 18;
   for (const s of R.setup){ t(s[0], 82, y); t(s[1], 268, y, 'right'); t('|', C, y, 'center'); t(s[2], 312, y); y += 16; }
