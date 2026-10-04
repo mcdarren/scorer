@@ -1,5 +1,5 @@
 /* Offline support for the 14.1 Scorebook. Version changes whenever any app file changes. */
-const CACHE = 'scorebook-52ecac4cf3';
+const CACHE = 'scorebook-a861854d20';
 const ASSETS = ['./', 'store.js', 'jspdf.umd.min.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'];
 // Cloudflare Pages answers /index.html with a redirect to /. Safari refuses a page that a service worker
 // serves from a redirected response, so every response is copied into a clean one before it is cached or served.

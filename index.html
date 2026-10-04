@@ -578,7 +578,7 @@ function renderScore(){
     $('pTitle').textContent = [m.title, `Race ${m.races[0]}–${m.races[1]}`].filter(Boolean).join(' · ');
     for (const i of [0,1]){
       $('pN' + i).textContent = m.names[i];
-      $('pS' + i).textContent = st.score[i];
+      $('pS' + i).textContent = st.score[i] + (i === st.sh ? cur.runSoFar : 0);   // balls already pocketed in a run spanning re-racks count straight away
       $('pR' + i).textContent = '/' + m.races[i];
       $('pF' + i).textContent = st.fouls[i] ? st.fouls[i] + (st.fouls[i] > 1 ? ' fouls' : ' foul') : '';
       $('pSub' + i).textContent = `Inn ${per[i].inn} · HR ${per[i].hr} · Avg ${per[i].avg.toFixed(2)}`;
