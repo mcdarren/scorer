@@ -132,6 +132,9 @@ button{cursor:pointer;touch-action:manipulation}
 .keys button:disabled{opacity:.25}
 .keys button:active:not(:disabled){transform:scale(.96)}
 .rkopts{display:grid;gap:8px}
+#endSheet .big{width:100%}
+#endSheet .btn.danger{justify-self:center;margin-top:10px;padding:10px 22px}
+#endSheet .btn.danger:disabled{opacity:.4}
 .rkopt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:14px;text-align:left}
 .rkopt b{font:700 20px var(--display);letter-spacing:.02em}
 .rkopt small{font-size:13px;color:var(--muted)}
@@ -254,7 +257,6 @@ button{cursor:pointer;touch-action:manipulation}
         <button class="btn" id="undoBtn">Undo</button>
         <button class="btn" id="endBtn">End match early</button>
       </div>
-      <div class="resume" id="endAsk" hidden><span>End this match now? It's saved as ended early.</span><span class="acts"><button class="btn danger" id="endYes">End match</button><button class="btn" id="endNo">Keep playing</button></span></div>
       <div class="loghead" id="pLogHead" hidden><span>#</span><span>Player</span><span>Ended</span><span>Run</span><span>Score</span></div>
       <ol class="log" id="pLog"></ol>
     </div>
@@ -312,6 +314,13 @@ button{cursor:pointer;touch-action:manipulation}
   <p class="q">The break didn't pocket a called ball or send the cue ball and two object balls to a cushion. The opponent chooses: take the table as it lies, or have the breaker break again.</p>
   <div class="two"><button class="btn" id="bfTake"></button><button class="btn" id="bfRe"></button></div>
   <button class="btn" id="bfCancel">Cancel</button>
+</div>
+<div class="scrim" id="scrim4" hidden></div>
+<div class="sheet" id="endSheet" hidden role="alertdialog" aria-modal="true" aria-labelledby="endTitle" aria-describedby="endQ">
+  <h3 id="endTitle"><span class="t-foul">End match early?</span></h3>
+  <p class="q" id="endQ"></p>
+  <button class="big" id="endNo">Keep playing</button>
+  <button class="btn danger" id="endYes">End the match</button>
 </div>
 <div class="toast" id="toast" role="status"></div>
 
@@ -565,9 +574,21 @@ $('bfTake').addEventListener('click', () => { closeBf(); addInning('bfoul', 15, 
 $('bfRe').addEventListener('click', () => { closeBf(); addInning('bfoul', 15, { rebreak:true }); });
 $('undoBtn').addEventListener('click', undo);
 $('dUndo').addEventListener('click', undo);
-$('endBtn').addEventListener('click', () => { $('endAsk').hidden = false; $('endBtn').hidden = true; });
-$('endNo').addEventListener('click', () => { $('endAsk').hidden = true; $('endBtn').hidden = false; });
-$('endYes').addEventListener('click', () => { $('endAsk').hidden = true; $('endBtn').hidden = false; LIVE.status = 'ended'; LIVE.finished = Date.now(); keepAwake(false); saveLive(); toast('Match ended and saved to History'); LIVE = null; store.set(LIVE_KEY, null); renderScore(); });
+// ending early asks first, on its own screen; "End the match" can't be hit by the same tap that opened it
+let endArm = 0;
+function openEnd(){
+  if (!LIVE) return;
+  const { st } = replay(LIVE), sc = i => st.score[i] + (i === st.sh ? cur.runSoFar : 0);
+  $('endQ').textContent = `${LIVE.names[0]} ${sc(0)} – ${sc(1)} ${LIVE.names[1]}, race ${LIVE.races[0]}–${LIVE.races[1]}. The match is saved to History as ended early, and you can resume it from there.`;
+  $('scrim4').hidden = false; $('endSheet').hidden = false;
+  $('endYes').disabled = true; clearTimeout(endArm); endArm = setTimeout(() => { $('endYes').disabled = false; }, 1200);
+  $('endNo').focus();
+}
+const closeEnd = () => { clearTimeout(endArm); $('scrim4').hidden = true; $('endSheet').hidden = true; };
+$('endBtn').addEventListener('click', openEnd);
+$('endNo').addEventListener('click', closeEnd); $('scrim4').addEventListener('click', closeEnd);
+$('endSheet').addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); closeEnd(); } });
+$('endYes').addEventListener('click', () => { if ($('endYes').disabled) return; closeEnd(); LIVE.status = 'ended'; LIVE.finished = Date.now(); keepAwake(false); saveLive(); toast('Match ended and saved to History'); LIVE = null; store.set(LIVE_KEY, null); renderScore(); });
 
 function renderScore(){
   const mode = !LIVE ? 'setup' : LIVE.status === 'live' ? 'play' : LIVE.status === 'finished' ? 'done' : 'setup';
@@ -879,7 +900,7 @@ function detail(m){
       <button class="btn primary" data-a="pdf">Download PDF</button>
       <button class="btn" data-a="csv">Download CSV</button>
       ${CFG.syncVideo ? '<button class="btn" data-a="video">Sync to a video</button>' : ''}
-      ${m.status === 'live' ? '<button class="btn" data-a="resume">Continue scoring</button>' : ''}
+      ${m.status === 'live' ? '<button class="btn" data-a="resume">Continue scoring</button>' : m.status === 'ended' ? '<button class="btn" data-a="reopen">Resume match</button>' : ''}
       ${delAsk === m.id ? '<span class="meta">Delete this match for good?</span><button class="btn danger" data-a="del2">Delete</button><button class="btn" data-a="keep">Keep</button>' : '<button class="btn danger" data-a="del">Delete</button>'}
     </div>`;
   d.addEventListener('click', e => {
@@ -889,6 +910,11 @@ function detail(m){
       case 'csv': saveFile(fileBase(m) + '.csv', csvText(m)); break;
       case 'video': if (!m.innings.length || !m.innings[0].ts){ toast('This match has no innings recorded yet, so there is nothing to line up with a video'); break; } CFG.syncVideo(m.id); break;
       case 'resume': LIVE = JSON.parse(JSON.stringify(m)); cur = LIVE.cur || { racks:0, runSoFar:0 }; store.set(LIVE_KEY, LIVE); keepAwake(true); show('score'); break;
+      case 'reopen': {
+        if (LIVE && LIVE.status === 'live' && LIVE.id !== m.id){ toast(`${LIVE.names[0]} v ${LIVE.names[1]} is still in progress. Finish or end it first.`); break; }
+        LIVE = JSON.parse(JSON.stringify(m)); LIVE.status = 'live'; delete LIVE.finished; cur = LIVE.cur || { racks:0, runSoFar:0 };
+        saveLive(); keepAwake(true); show('score'); toast('Match resumed'); break;
+      }
       case 'del': delAsk = m.id; renderList(); break;
       case 'keep': delAsk = null; renderList(); break;
       case 'del2': delAsk = null; if (LIVE && LIVE.id === m.id){ LIVE = null; store.set(LIVE_KEY, null); } remove(m.id); toast('Match deleted'); break;
